@@ -175,6 +175,7 @@ local BorderBox = Widget:extend "BorderBox" do
     drawBox(self.borderType == "single" and 1 or 2, dim)
     
     gpu.setForeground(self.titleForeground)
+    gpu.fill(dim.x + 2, dim.y, #self.title, 1, " ")
     gpu.set(dim.x + 2, dim.y, self.title)
   end
 end
