@@ -81,7 +81,7 @@ local Margin = Padding:extend "Margin"
 
 
 local boxChars = {
-  signle = {
+  single = {
     hl = "─",
     vl = "│",
     
@@ -144,37 +144,97 @@ local Label = Widget:extend "Label" do
                  or #options.caption
     
     self.caption = options.caption or ""
-    self.color = options.color or 0xFFFFFF
+    self.foreground = options.foreground or 0xFFFFFF
   end
   
   function Label:draw(dim)
     gpu.setBackground(({gpu.get(dim.x, dim.y)})[3])
-    gpu.setForeground(self.color)
+    gpu.setForeground(self.foreground)
     
     gpu.set(dim.x, dim.y, self.caption)
   end
 end
 
 
-local Toolbar = Widget:extend "Toolbar" do
-  function Toolbar:init(options)
+local BorderBox = Widget:extend "BorderBox" do
+  function BorderBox:init(options)
     options = type(options) == "table" and options or {}
     Widget.init(self, options)
     
-    self.dim.h = 1
-    self.dim.w = self.dim.w or 0
+    self.title = options.title or ""
+    self.foreground = options.foreground or 0xFFFFFF
+    self.titleForeground = options.titleForeground or 0xFFFFFF
     
-    self.title = options.title or "Untiled"
-    self.background = options.background or 0x89ad8d
-    self.color = options.color or 0x615d58
+    self.borderType = options.borderType or "single"
   end
   
-  function Toolbar:draw(dim)
-    gpu.setBackground(self.background)
-    gpu.setForeground(self.color)
+  function BorderBox:draw(dim)
+    gpu.setBackground(({gpu.get(dim.x, dim.y)})[3])
+    gpu.setForeground(self.foreground)
+    
+    drawBox(self.borderType == "single" and 1 or 2, dim)
+    
+    gpu.setForeground(self.titleForeground)
+    gpu.set(dim.x + 2, dim.y, self.title)
+  end
+end
+
+
+local Button = Widget:extend "Button" do
+  function Button:init(options)
+    options = type(options) == "table" and options or {}
+    Widget.init(self, options)
+    
+    self.dim.h = self.dim.h > 0 and self.dim.h or 1
+    self.dim.w = self.dim.w > #options.caption + 4 and self.dim.w 
+                 or #options.caption + 4
+    
+    self.caption = options.caption or ""
+    self.background = options.background or 0x3465a4
+    self.foreground = options.foreground or 0xffffff
+    self.activeBackground = options.activeBackground or 0x7093bf
+    self.activeForeground = options.activeForeground or 0xffffff
+    
+    self:bind("signal:touch", function (_, addr, x, y, nick)
+      if self.cdim:pointCollision(x, y) then
+        self:dispatch("click", self, addr, x, y, nick)
+        self:draw(self.cdim, true)
+        os.sleep(0.5)
+        self:draw(self.cdim)
+      end
+    end)
+  end
+  
+  function Button:draw(dim, clicked)
+    self.cdim = dim
+    
+    if clicked then
+      gpu.setBackground(self.activeBackground)
+      gpu.setForeground(self.activeForeground)
+    else
+      gpu.setBackground(self.background)
+      gpu.setForeground(self.foreground)
+    end
+    
+    local capX, capY = math.ceil(dim.w / 2 - #self.caption / 2), 
+                       math.ceil(dim.h / 2)
     
     gpu.fill(dim.x, dim.y, dim.w, dim.h, " ")
-    gpu.set(dim.x + 1, dim.y, self.title)
+    
+    if dim.h == 1 then
+      gpu.set(dim.x, dim.y, "[")
+      gpu.set(dim.x + dim.w - 1, dim.y, "]")
+    else
+      gpu.fill(dim.x, dim.y, 1, dim.h, boxChars.single.vl)
+      gpu.fill(dim.x + dim.w - 1, dim.y, 1, dim.h, boxChars.single.vl)
+      
+      gpu.set(dim.x, dim.y, boxChars.single.tl)
+      gpu.set(dim.x + dim.w - 1, dim.y, boxChars.single.tr)
+      gpu.set(dim.x, dim.y + dim.h - 1, boxChars.single.bl)
+      gpu.set(dim.x + dim.w - 1, dim.y + dim.h - 1, boxChars.single.br)
+    end
+    
+    gpu.set(dim.x + capX, dim.y + capY - 1, self.caption)
   end
 end
 
@@ -192,6 +252,13 @@ local App = EventDispatcher:extend "App" do
     self.padding = options.padding or Padding()
     
     self.widgets = {}
+    
+    self:bind("signal", function (name, ...)
+      for _, widget in ipairs(self.widgets) do
+        widget:dispatch("signal", widget, name, ...)
+        widget:dispatch("signal:".. tostring(name), widget, ...)
+      end
+    end)
   end
   
   function App:stop()
@@ -234,8 +301,8 @@ local App = EventDispatcher:extend "App" do
           local widgetDim = Dim(
             widget.dim.x + self.padding.left, 
             widget.dim.y + self.padding.top,
-            widget.dim.w - self.padding.left - self.padding.right,
-            widget.dim.h - self.padding.top - self.padding.bottom
+            widget.dim.w,
+            widget.dim.h
           )
           
           if maxDim:pointCollision(widgetDim.x, widgetDim.y) and
@@ -278,5 +345,6 @@ return {
   App = App,
   
   Label = Label,
-  Toolbar = Toolbar
+  BorderBox = BorderBox,
+  Button = Button
 }

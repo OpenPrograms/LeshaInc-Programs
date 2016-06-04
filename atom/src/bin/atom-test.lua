@@ -1,16 +1,40 @@
 package.loaded["atom"] = nil
 
 local atom = require("atom")
-local app = atom.App()
+local App, Dim, Label, Button, BorderBox = 
+    atom.App, atom.Dim, atom.Label, atom.Button, atom.BorderBox
 
-app:add(atom.Toolbar{
-    dim = atom.Dim(1, 1, 80, 1),
-    title = "GLaDOS Atom Demo"
+
+local app = App{
+    padding = atom.Padding(1, 1, 1, 1)
+}
+
+app:add(Label{
+    dim = Dim(3, 4),
+    caption = "Label"
 })
 
-app:add(atom.Label{
-    dim = atom.Dim(2, 3),
-    caption = "Hello, world!"
+app:add(Button{
+    dim = Dim(10, 4),
+    caption = "Button"
+})
+
+do
+    local b = Button{
+        dim = Dim(22, 3, _, 3),
+        caption = "Big Button"
+    }
+    
+    b:bind("click", function ()
+        print("WOW!")
+    end)
+    
+    app:add(b)
+end
+
+app:add(BorderBox{
+    dim = Dim(1, 1, 37, 7),
+    title = "BorderBox"
 })
 
 app:run()
