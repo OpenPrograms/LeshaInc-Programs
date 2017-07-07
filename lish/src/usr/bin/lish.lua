@@ -107,7 +107,13 @@ local function expandBraces(word, idx, expansions)
       end
     end
 
-    if char == "" then return end
+    if char == "" then
+      if pre ~= "" then
+        table.insert(expansions, {idx, {pre}})
+      end
+
+      return
+    end
 
     if char == "\\" then
       escape = true
@@ -142,30 +148,40 @@ local function parseWord(state)
   local braceExpansions = {}
   local s, e = state.pos, state.pos - 1
   local quote = ""
+  local escape
 
   while #state.input > 0 do
     local char = state.input:sub(1, 1)
 
-    if quote == "" and isIFS(char) then break end
+    if not escape and quote == "" and isIFS(char) then break end
 
     e = e + 1
 
-    if char == quote then
-      table.insert(word, state.original:sub(s + 1, e - 1))
+    if not escape and char == quote then
+      table.insert(word, ({state.original:sub(s, e - 1):gsub("\\(.)","%1")})[1])
       s = e + 1
       e = s - 1
       quote = ""
-    elseif quote == "" and char == '"' or char == "'" then
-      expandBraces(state.original:sub(s, e - 1), #word + 1, braceExpansions)
+    elseif char == "\\" then
+      escape = true
+    elseif not escape and quote == "" and char == '"' or char == "'" then
+      expandBraces(state.original:sub(s, e - 1):gsub("\\(.)","%1"), #word + 1, braceExpansions)
       quote = char
       s = e + 1
       e = s - 1
     end
 
     state:advance(1)
+
+    if escape and char ~= "\\" then escape = false end
   end
 
-  expandBraces(state.original:sub(s, e), #word + 1, braceExpansions)
+  if quote ~= "" then
+    state:advance(-1)
+    parseError(state, "unclosed quote")
+  end
+
+  expandBraces(state.original:sub(s, e):gsub("\\(.)","%1"), #word + 1, braceExpansions)
 
   local words = {word}
 
@@ -193,11 +209,14 @@ local function parseWord(state)
   return words
 end
 
-local state = parserState([[{1..2}-{1..3}-{1..4}]])
+local state = parserState([[hello\ world]])
 local parser = createParser(parseWord)
 print(state)
-for _, word in ipairs(parser(state)) do
+local words, reason = parser(state)
+if reason then print(reason) return end
+for _, word in ipairs(words) do
   io.write(("%s"):format(word), " ")
 end
+io.write("\n")
 print(state)
 
