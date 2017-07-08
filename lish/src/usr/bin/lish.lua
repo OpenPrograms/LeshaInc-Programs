@@ -135,6 +135,44 @@ local function expandBraces(word, idx, expansions)
   end
 end
 
+local function getHome()
+  return os.getenv("HOME")
+end
+
+local function getPWD()
+  return os.getenv("PWD")
+end
+
+local function getOLDPWD()
+  return os.getenv("OLDPWD")
+end
+
+local function expandTilde(word)
+  if word == "~" then
+    return getHome() or "~"
+  elseif word == "~+" then
+    return getPWD() or "~+"
+  elseif word == "~-" then
+    return getOLDPWD() or "~-"
+  elseif word:match("^~/") then
+    return word:gsub("^~", getHome() or "~")
+  elseif word:match("^~%+/") then
+    return word:gsub("^~%+", getPWD() or "~+")
+  elseif word:match("^~-/") then
+    return word:gsub("^~-", getOLDPWD() or "~-")
+  else
+    return word
+  end
+end
+
+local function map(f, t)
+  local r = {}
+  for i, v in ipairs(t) do
+    r[i] = f(v)
+  end
+  return r
+end
+
 local function copyStrings(strings)
   local out = {}
   for i, string in ipairs(strings) do
@@ -183,9 +221,12 @@ local function parseWord(state)
 
   expandBraces(state.original:sub(s, e):gsub("\\(.)","%1"), #word + 1, braceExpansions)
 
+
   local words = {word}
 
   for i = #braceExpansions, 1, -1 do
+    braceExpansions[i][2] = map(expandTilde, braceExpansions[i][2])
+
     local wordIndex, variants = braceExpansions[i][1], braceExpansions[i][2]
     local len = #words
     for j = 1, len do
@@ -209,7 +250,7 @@ local function parseWord(state)
   return words
 end
 
-local state = parserState([[hello\ world]])
+local state = parserState([[{~,\ }/test]])
 local parser = createParser(parseWord)
 print(state)
 local words, reason = parser(state)
